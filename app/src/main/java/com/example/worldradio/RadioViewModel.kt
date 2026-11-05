@@ -1,21 +1,27 @@
 package com.example.worldradio
 
 import android.app.Application
+import android.content.ComponentName
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
+import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.launch
 import java.util.UUID
 
 class RadioViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val player = ExoPlayer.Builder(application).build()
+    private var controllerFuture: ListenableFuture<MediaController>? = null
+    private var mediaController: MediaController? = null
 
     var searchResults by mutableStateOf<List<RadioStation>>(emptyList())
         private set
@@ -32,11 +38,37 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     init {
-        player.addListener(object : Player.Listener {
-            override fun onIsPlayingChanged(playing: Boolean) {
-                isPlaying = playing
+        val sessionToken = SessionToken(
+            application,
+            ComponentName(application, PlaybackService::class.java)
+        )
+        val future = MediaController.Builder(application, sessionToken).buildAsync()
+        controllerFuture = future
+
+        future.addListener({
+            val controller = future.get()
+            mediaController = controller
+            isPlaying = controller.isPlaying
+
+            controller.currentMediaItem?.let { item ->
+                if (currentStation == null && item.mediaId.isNotEmpty()) {
+                    currentStation = RadioStation(
+                        id = item.mediaId,
+                        name = item.mediaMetadata.title?.toString() ?: "Radio",
+                        streamUrl = "",
+                        country = item.mediaMetadata.subtitle?.toString() ?: "",
+                        tags = ""
+                    )
+                }
             }
-        })
+
+            controller.addListener(object : Player.Listener {
+                override fun onIsPlayingChanged(playing: Boolean) {
+                    isPlaying = playing
+                }
+            })
+        }, ContextCompat.getMainExecutor(application))
+
         search("Polska")
     }
 
@@ -55,21 +87,36 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun playStation(station: RadioStation) {
+        val controller = mediaController ?: return
         if (currentStation?.id == station.id) {
             togglePlayPause()
             return
         }
         currentStation = station
-        player.setMediaItem(MediaItem.fromUri(station.streamUrl))
-        player.prepare()
-        player.play()
+
+        val metadata = MediaMetadata.Builder()
+            .setTitle(station.name.trim())
+            .setArtist(station.country)
+            .setSubtitle(station.country)
+            .build()
+
+        val mediaItem = MediaItem.Builder()
+            .setMediaId(station.id)
+            .setUri(station.streamUrl)
+            .setMediaMetadata(metadata)
+            .build()
+
+        controller.setMediaItem(mediaItem)
+        controller.prepare()
+        controller.play()
     }
 
     fun togglePlayPause() {
-        if (player.isPlaying) {
-            player.pause()
+        val controller = mediaController ?: return
+        if (controller.isPlaying) {
+            controller.pause()
         } else {
-            player.play()
+            controller.play()
         }
     }
 
@@ -99,6 +146,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
-        player.release()
+        controllerFuture?.let { MediaController.releaseFuture(it) }
     }
 }
