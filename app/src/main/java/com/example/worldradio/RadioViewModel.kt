@@ -2,7 +2,6 @@ package com.example.worldradio
 
 import android.app.Application
 import android.content.ComponentName
-import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -16,15 +15,10 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.launch
 import java.util.UUID
 
 class RadioViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val prefs = application.getSharedPreferences("dorota_radio_prefs", Context.MODE_PRIVATE)
-    private val gson = Gson()
 
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var mediaController: MediaController? = null
@@ -44,8 +38,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     init {
-        loadFavorites()
-
         val sessionToken = SessionToken(
             application,
             ComponentName(application, PlaybackService::class.java)
@@ -78,25 +70,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         }, ContextCompat.getMainExecutor(application))
 
         search("Polska")
-    }
-
-    private fun loadFavorites() {
-        val json = prefs.getString("favorite_stations", null)
-        if (!json.isNullOrEmpty()) {
-            try {
-                val type = object : TypeToken<List<RadioStation>>() {}.type
-                val savedList: List<RadioStation> = gson.fromJson(json, type)
-                favoriteStations.clear()
-                favoriteStations.addAll(savedList)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-
-    private fun saveFavorites() {
-        val json = gson.toJson(favoriteStations.toList())
-        prefs.edit().putString("favorite_stations", json).apply()
     }
 
     fun search(query: String) {
@@ -154,7 +127,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             favoriteStations.add(station)
         }
-        saveFavorites()
     }
 
     fun addCustomStation(name: String, url: String, country: String) {
@@ -166,7 +138,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             tags = "Własny strumień"
         )
         favoriteStations.add(newStation)
-        saveFavorites()
     }
 
     fun isFavorite(station: RadioStation): Boolean {

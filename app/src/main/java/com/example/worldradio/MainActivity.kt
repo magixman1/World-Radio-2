@@ -51,7 +51,7 @@ fun RadioApp(viewModel: RadioViewModel = viewModel()) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("World Radio") },
+                title = { Text("Dorota Radio") },
                 actions = {
                     IconButton(onClick = { showAddDialog = true }) {
                         Icon(Icons.Default.Add, contentDescription = "Dodaj własną stację")
