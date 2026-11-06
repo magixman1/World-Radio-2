@@ -147,6 +147,24 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun nextStation() {
+        val current = currentStation ?: return
+        val list = if (favoriteStations.any { it.id == current.id }) favoriteStations else searchResults
+        if (list.isEmpty()) return
+        val index = list.indexOfFirst { it.id == current.id }
+        val nextIndex = if (index in 0 until list.size - 1) index + 1 else 0
+        playStation(list[nextIndex])
+    }
+
+    fun previousStation() {
+        val current = currentStation ?: return
+        val list = if (favoriteStations.any { it.id == current.id }) favoriteStations else searchResults
+        if (list.isEmpty()) return
+        val index = list.indexOfFirst { it.id == current.id }
+        val prevIndex = if (index > 0) index - 1 else list.size - 1
+        playStation(list[prevIndex])
+    }
+
     fun toggleFavorite(station: RadioStation) {
         val existing = favoriteStations.find { it.id == station.id }
         if (existing != null) {
