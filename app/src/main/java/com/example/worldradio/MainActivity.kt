@@ -106,10 +106,10 @@ fun RadioApp(viewModel: RadioViewModel = viewModel()) {
                         .fillMaxWidth()
                         .background(Color(0xFF0B0C14))
                 ) {
-                    // Mini-odtwarzacz w stylu pigułki Samsung Music
                     viewModel.currentStation?.let { station ->
                         SamsungMiniPlayer(
                             station = station,
+                            songTitle = viewModel.currentSongTitle,
                             isPlaying = viewModel.isPlaying,
                             isFavorite = viewModel.isFavorite(station),
                             onPlayPause = { viewModel.togglePlayPause() },
@@ -119,7 +119,6 @@ fun RadioApp(viewModel: RadioViewModel = viewModel()) {
                             onExpand = { isPlayerExpanded = true }
                         )
                     }
-                    // Dolne zakładki w stylu Samsung Music (tekstowe / minimalistyczne ikony)
                     NavigationBar(
                         containerColor = Color(0xFF0B0C14),
                         tonalElevation = 0.dp
@@ -163,7 +162,6 @@ fun RadioApp(viewModel: RadioViewModel = viewModel()) {
             }
         }
 
-        // Pełnoekranowy odtwarzacz w stylu Samsung Music (One UI)
         AnimatedVisibility(
             visible = isPlayerExpanded && viewModel.currentStation != null,
             enter = slideInVertically(initialOffsetY = { it }),
@@ -172,6 +170,7 @@ fun RadioApp(viewModel: RadioViewModel = viewModel()) {
             viewModel.currentStation?.let { station ->
                 SamsungFullPlayerScreen(
                     station = station,
+                    songTitle = viewModel.currentSongTitle,
                     isPlaying = viewModel.isPlaying,
                     isFavorite = viewModel.isFavorite(station),
                     onPlayPause = { viewModel.togglePlayPause() },
@@ -199,6 +198,7 @@ fun RadioApp(viewModel: RadioViewModel = viewModel()) {
 @Composable
 fun SamsungMiniPlayer(
     station: RadioStation,
+    songTitle: String,
     isPlaying: Boolean,
     isFavorite: Boolean,
     onPlayPause: () -> Unit,
@@ -234,7 +234,6 @@ fun SamsungMiniPlayer(
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Okrągła okładka / obracająca się tarcza jak w Samsung Music
             Box(
                 modifier = Modifier
                     .size(46.dp)
@@ -267,9 +266,8 @@ fun SamsungMiniPlayer(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = viewModel.currentSongTitle,
+                    text = songTitle,
                     color = Color(0xFF00D2FF),
-                    color = Color(0xFFA0A5BA),
                     fontSize = 12.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -307,6 +305,7 @@ fun SamsungMiniPlayer(
 @Composable
 fun SamsungFullPlayerScreen(
     station: RadioStation,
+    songTitle: String,
     isPlaying: Boolean,
     isFavorite: Boolean,
     onPlayPause: () -> Unit,
@@ -339,7 +338,6 @@ fun SamsungFullPlayerScreen(
             .padding(horizontal = 24.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Górny pasek ze strzałką zwijania w dół (styl One UI)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -372,7 +370,6 @@ fun SamsungFullPlayerScreen(
 
         Spacer(modifier = Modifier.height(28.dp))
 
-        // Duża centralna karta albumu z miękkim cieniem i zaokrągleniem Samsung Music
         Box(
             modifier = Modifier
                 .size(270.dp)
@@ -426,7 +423,6 @@ fun SamsungFullPlayerScreen(
 
         Spacer(modifier = Modifier.height(36.dp))
 
-        // Tytuł stacji i kraj / tagi wyśrodkowane jak w Samsung Music
         Text(
             text = station.name.trim(),
             color = Color.White,
@@ -438,8 +434,8 @@ fun SamsungFullPlayerScreen(
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = "${station.country.ifEmpty { "Świat" }} • ${station.tags.ifEmpty { "Radio internetowe" }}",
-            color = Color(0xFFA5AABF),
+            text = songTitle,
+            color = Color(0xFF00D2FF),
             fontSize = 15.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -448,12 +444,10 @@ fun SamsungFullPlayerScreen(
 
         Spacer(modifier = Modifier.height(28.dp))
 
-        // Wizualny pasek fali dźwiękowej / strumienia na żywo
         SamsungWaveBar(isPlaying = isPlaying)
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Główne przyciski sterowania odtwarzaczem (Poprzednia, Duży okrągły Play/Pause, Następna)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -505,7 +499,6 @@ fun SamsungFullPlayerScreen(
 
         Spacer(modifier = Modifier.height(28.dp))
 
-        // Dolny suwak głośności w stylu Samsung Music
         Row(
             modifier = Modifier
                 .fillMaxWidth()
