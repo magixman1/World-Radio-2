@@ -4,7 +4,6 @@ import android.app.Application
 import android.content.ComponentName
 import android.content.Context
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
@@ -32,9 +31,12 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     var searchResults by mutableStateOf<List<RadioStation>>(emptyList())
         private set
 
-    val favoriteStations = mutableStateListOf<RadioStation>()
+    val favoriteStations = mutableListOf<RadioStation>()
 
     var currentStation by mutableStateOf<RadioStation?>(null)
+        private set
+
+    var currentSongTitle by mutableStateOf<String>("Trwa ładowanie strumienia...")
         private set
 
     var isPlaying by mutableStateOf(false)
@@ -70,14 +72,36 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
+            // Odczyt metadanych utworu z strumienia radiowego (ICY metadata)
+            controller.mediaMetadata.let { meta ->
+                val title = meta.title?.toString()
+                val artist = meta.artist?.toString()
+                updateSongTitleText(title, artist)
+            }
+
             controller.addListener(object : Player.Listener {
                 override fun onIsPlayingChanged(playing: Boolean) {
                     isPlaying = playing
+                }
+
+                override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
+                    val title = mediaMetadata.title?.toString()
+                    val artist = mediaMetadata.artist?.toString()
+                    updateSongTitleText(title, artist)
                 }
             })
         }, ContextCompat.getMainExecutor(application))
 
         search("Polska")
+    }
+
+    private fun updateSongTitleText(title: String?, artist: String?) {
+        currentSongTitle = when {
+            !title.isNullOrBlank() && !artist.isNullOrBlank() -> "$artist - $title"
+            !title.isNullOrBlank() -> title
+            !artist.isNullOrBlank() -> artist
+            else -> currentStation?.name?.let { "Na żywo: $it" } ?: "Odtwarzanie radia"
+        }
     }
 
     private fun loadFavorites() {
@@ -120,6 +144,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         currentStation = station
+        currentSongTitle = "Łączenie z ${station.name}..."
 
         val metadata = MediaMetadata.Builder()
             .setTitle(station.name.trim())

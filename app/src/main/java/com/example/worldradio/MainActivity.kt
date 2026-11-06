@@ -267,7 +267,8 @@ fun SamsungMiniPlayer(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = station.country.ifEmpty { "Stacja radiowa" },
+                    text = viewModel.currentSongTitle,
+                    color = Color(0xFF00D2FF),
                     color = Color(0xFFA0A5BA),
                     fontSize = 12.sp,
                     maxLines = 1,
