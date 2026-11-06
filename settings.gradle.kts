@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "WorldRadio"
+rootProject.name = "Dorota Radio"
 include(":app")
