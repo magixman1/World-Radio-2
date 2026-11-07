@@ -11,6 +11,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -31,14 +32,18 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.SubcomposeAsyncImage
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,6 +71,61 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@Composable
+fun StationArtwork(
+    faviconUrl: String?,
+    modifier: Modifier = Modifier,
+    iconSize: Dp = 28.dp
+) {
+    val cleanUrl = faviconUrl?.trim().orEmpty()
+    if (cleanUrl.startsWith("http")) {
+        SubcomposeAsyncImage(
+            model = cleanUrl,
+            contentDescription = "Ikona stacji",
+            modifier = modifier.background(Color(0xFF1E2235)),
+            contentScale = ContentScale.Crop,
+            loading = {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Radio,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.size(iconSize)
+                    )
+                }
+            },
+            error = {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Radio,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.85f),
+                        modifier = Modifier.size(iconSize)
+                    )
+                }
+            }
+        )
+    } else {
+        Box(
+            modifier = modifier,
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Radio,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.9f),
+                modifier = Modifier.size(iconSize)
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RadioApp(viewModel: RadioViewModel = viewModel()) {
@@ -83,11 +143,21 @@ fun RadioApp(viewModel: RadioViewModel = viewModel()) {
                         titleContentColor = Color.White
                     ),
                     title = {
-                        Text(
-                            "Dorota Radio",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 22.sp
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Image(
+                                painter = painterResource(id = R.mipmap.ic_launcher_round),
+                                contentDescription = "Logo Dorota Radio",
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .clip(CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                "Dorota Radio",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 22.sp
+                            )
+                        }
                     },
                     actions = {
                         IconButton(onClick = { showAddDialog = true }) {
@@ -186,8 +256,8 @@ fun RadioApp(viewModel: RadioViewModel = viewModel()) {
     if (showAddDialog) {
         AddStationDialog(
             onDismiss = { showAddDialog = false },
-            onAdd = { name, url, country ->
-                viewModel.addCustomStation(name, url, country)
+            onAdd = { name, url, country, iconUrl ->
+                viewModel.addCustomStation(name, url, country, iconUrl)
                 showAddDialog = false
                 selectedTab = 1
             }
@@ -234,7 +304,9 @@ fun SamsungMiniPlayer(
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
+            StationArtwork(
+                faviconUrl = station.favicon,
+                iconSize = 24.dp,
                 modifier = Modifier
                     .size(46.dp)
                     .rotate(if (isPlaying) rotation else 0f)
@@ -243,16 +315,8 @@ fun SamsungMiniPlayer(
                         Brush.linearGradient(
                             colors = listOf(Color(0xFF7B61FF), Color(0xFF00D2FF))
                         )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.GraphicEq,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
+                    )
+            )
 
             Spacer(modifier = Modifier.width(12.dp))
 
@@ -386,37 +450,37 @@ fun SamsungFullPlayerScreen(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    imageVector = Icons.Default.Radio,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.92f),
-                    modifier = Modifier.size(96.dp)
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Surface(
-                    color = Color.Black.copy(alpha = 0.35f),
-                    shape = RoundedCornerShape(50)
+            StationArtwork(
+                faviconUrl = station.favicon,
+                iconSize = 96.dp,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 14.dp),
+                color = Color.Black.copy(alpha = 0.55f),
+                shape = RoundedCornerShape(50)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(if (isPlaying) Color(0xFF00FF88) else Color.Gray)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (isPlaying) "LIVE STREAM" else "PAUZA",
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp
-                        )
-                    }
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(if (isPlaying) Color(0xFF00FF88) else Color.Gray)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isPlaying) "LIVE STREAM" else "PAUZA",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
                 }
             }
         }
@@ -681,23 +745,17 @@ fun StationList(
                     modifier = Modifier.padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
+                    StationArtwork(
+                        faviconUrl = station.favicon,
+                        iconSize = 24.dp,
                         modifier = Modifier
                             .size(48.dp)
                             .clip(RoundedCornerShape(14.dp))
                             .background(
                                 if (isSelected) Brush.linearGradient(listOf(Color(0xFF7B61FF), Color(0xFF00D2FF)))
                                 else Brush.linearGradient(listOf(Color(0xFF25283D), Color(0xFF25283D)))
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = if (isSelected) Icons.Default.GraphicEq else Icons.Default.Radio,
-                            contentDescription = null,
-                            modifier = Modifier.size(26.dp),
-                            tint = if (isSelected) Color.White else Color(0xFF8C7AE6)
-                        )
-                    }
+                            )
+                    )
                     Spacer(modifier = Modifier.width(14.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -733,11 +791,12 @@ fun StationList(
 @Composable
 fun AddStationDialog(
     onDismiss: () -> Unit,
-    onAdd: (name: String, url: String, country: String) -> Unit
+    onAdd: (name: String, url: String, country: String, iconUrl: String) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("") }
     var country by remember { mutableStateOf("") }
+    var iconUrl by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -765,11 +824,17 @@ fun AddStationDialog(
                     label = { Text("Kraj (opcjonalnie)") },
                     singleLine = true
                 )
+                OutlinedTextField(
+                    value = iconUrl,
+                    onValueChange = { iconUrl = it },
+                    label = { Text("URL ikony stacji (opcjonalnie)") },
+                    singleLine = true
+                )
             }
         },
         confirmButton = {
             Button(
-                onClick = { if (name.isNotBlank() && url.isNotBlank()) onAdd(name, url, country) },
+                onClick = { if (name.isNotBlank() && url.isNotBlank()) onAdd(name, url, country, iconUrl) },
                 enabled = name.isNotBlank() && url.isNotBlank()
             ) {
                 Text("Dodaj")

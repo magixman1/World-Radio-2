@@ -11,7 +11,8 @@ data class RadioStation(
     @SerializedName("name") val name: String,
     @SerializedName("url_resolved") val streamUrl: String,
     @SerializedName("country") val country: String,
-    @SerializedName("tags") val tags: String
+    @SerializedName("tags") val tags: String,
+    @SerializedName("favicon") val favicon: String? = ""
 )
 
 interface RadioBrowserApi {

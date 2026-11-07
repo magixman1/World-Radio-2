@@ -3,7 +3,9 @@ package com.example.worldradio
 import android.app.Application
 import android.content.ComponentName
 import android.content.Context
+import android.net.Uri
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
@@ -31,7 +33,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     var searchResults by mutableStateOf<List<RadioStation>>(emptyList())
         private set
 
-    val favoriteStations = mutableListOf<RadioStation>()
+    val favoriteStations = mutableStateListOf<RadioStation>()
 
     var currentStation by mutableStateOf<RadioStation?>(null)
         private set
@@ -67,12 +69,12 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
                         name = item.mediaMetadata.title?.toString() ?: "Dorota Radio",
                         streamUrl = "",
                         country = item.mediaMetadata.subtitle?.toString() ?: "",
-                        tags = ""
+                        tags = "",
+                        favicon = item.mediaMetadata.artworkUri?.toString() ?: ""
                     )
                 }
             }
 
-            // Odczyt metadanych utworu z strumienia radiowego (ICY metadata)
             controller.mediaMetadata.let { meta ->
                 val title = meta.title?.toString()
                 val artist = meta.artist?.toString()
@@ -146,16 +148,21 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         currentStation = station
         currentSongTitle = "Łączenie z ${station.name}..."
 
-        val metadata = MediaMetadata.Builder()
+        val metadataBuilder = MediaMetadata.Builder()
             .setTitle(station.name.trim())
             .setArtist(station.country)
             .setSubtitle(station.country)
-            .build()
+
+        if (!station.favicon.isNullOrBlank()) {
+            try {
+                metadataBuilder.setArtworkUri(Uri.parse(station.favicon.trim()))
+            } catch (_: Exception) {}
+        }
 
         val mediaItem = MediaItem.Builder()
             .setMediaId(station.id)
             .setUri(station.streamUrl)
-            .setMediaMetadata(metadata)
+            .setMediaMetadata(metadataBuilder.build())
             .build()
 
         controller.setMediaItem(mediaItem)
@@ -200,13 +207,14 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         saveFavorites()
     }
 
-    fun addCustomStation(name: String, url: String, country: String) {
+    fun addCustomStation(name: String, url: String, country: String, iconUrl: String = "") {
         val newStation = RadioStation(
             id = UUID.randomUUID().toString(),
             name = name.trim(),
             streamUrl = url.trim(),
             country = country.trim().ifEmpty { "Własna" },
-            tags = "Własny strumień"
+            tags = "Własny strumień",
+            favicon = iconUrl.trim()
         )
         favoriteStations.add(newStation)
         saveFavorites()
