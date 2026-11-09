@@ -49,6 +49,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         loadFavorites()
+        ensureDefaultPresetStations()
 
         val sessionToken = SessionToken(
             application,
@@ -97,6 +98,47 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         search("Polska")
     }
 
+    private fun ensureDefaultPresetStations() {
+        val hitsShropshireId = "preset-hits-radio-black-country-shropshire"
+        val greatestHitsShropshireId = "preset-greatest-hits-black-country-shropshire"
+
+        var modified = false
+
+        if (favoriteStations.none { it.id == hitsShropshireId }) {
+            favoriteStations.add(
+                0,
+                RadioStation(
+                    id = hitsShropshireId,
+                    name = "Hits Radio Black Country & Shropshire",
+                    streamUrl = "http://edge-bauermz-01-gos2.sharp-stream.com/freeblackcountry.mp3",
+                    country = "UK",
+                    tags = "Shropshire • Black Country • Free Radio",
+                    favicon = "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Hits_Radio_2022.svg/512px-Hits_Radio_2022.svg.png"
+                )
+            )
+            modified = true
+        }
+
+        if (favoriteStations.none { it.id == greatestHitsShropshireId }) {
+            favoriteStations.add(
+                1,
+                RadioStation(
+                    id = greatestHitsShropshireId,
+                    name = "Greatest Hits Radio Black Country & Shropshire",
+                    streamUrl = "http://tx.planetradio.co.uk/icecast.php?i=net2blackcountry.mp3",
+                    country = "UK",
+                    tags = "70s 80s 90s • Shropshire",
+                    favicon = "https://upload.wikimedia.org/wikipedia/en/thumb/5/52/Greatest_Hits_Radio_logo.svg/512px-Greatest_Hits_Radio_logo.svg.png"
+                )
+            )
+            modified = true
+        }
+
+        if (modified) {
+            saveFavorites()
+        }
+    }
+
     private fun updateSongTitleText(title: String?, artist: String?) {
         currentSongTitle = when {
             !title.isNullOrBlank() && !artist.isNullOrBlank() -> "$artist - $title"
@@ -130,7 +172,22 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             isLoading = true
             try {
-                searchResults = RetrofitInstance.api.searchStations(query.trim())
+                val apiResults = RetrofitInstance.api.searchStations(query.trim()).toMutableList()
+                val q = query.trim().lowercase()
+                if (q.contains("hits") || q.contains("shropshire") || q.contains("black country") || q.contains("free")) {
+                    val preset = RadioStation(
+                        id = "preset-hits-radio-black-country-shropshire",
+                        name = "Hits Radio Black Country & Shropshire",
+                        streamUrl = "http://edge-bauermz-01-gos2.sharp-stream.com/freeblackcountry.mp3",
+                        country = "UK",
+                        tags = "Shropshire • Black Country • Free Radio",
+                        favicon = "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Hits_Radio_2022.svg/512px-Hits_Radio_2022.svg.png"
+                    )
+                    if (apiResults.none { it.id == preset.id }) {
+                        apiResults.add(0, preset)
+                    }
+                }
+                searchResults = apiResults
             } catch (e: Exception) {
                 searchResults = emptyList()
             } finally {
