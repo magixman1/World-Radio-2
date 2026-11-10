@@ -13,6 +13,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -38,7 +39,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     var currentStation by mutableStateOf<RadioStation?>(null)
         private set
 
-    var currentSongTitle by mutableStateOf<String>("Trwa ładowanie strumienia...")
+    var currentSongTitle by mutableStateOf<String>("Wybierz stację, aby rozpocząć")
         private set
 
     var isPlaying by mutableStateOf(false)
@@ -85,12 +86,19 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             controller.addListener(object : Player.Listener {
                 override fun onIsPlayingChanged(playing: Boolean) {
                     isPlaying = playing
+                    if (playing && currentSongTitle.startsWith("Łączenie")) {
+                        currentSongTitle = "Na żywo: ${currentStation?.name ?: "Radio"}"
+                    }
                 }
 
                 override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
                     val title = mediaMetadata.title?.toString()
                     val artist = mediaMetadata.artist?.toString()
                     updateSongTitleText(title, artist)
+                }
+
+                override fun onPlayerError(error: PlaybackException) {
+                    currentSongTitle = "Błąd strumienia (kod: ${error.errorCodeName})"
                 }
             })
         }, ContextCompat.getMainExecutor(application))
@@ -99,52 +107,47 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun ensureDefaultPresetStations() {
-        val hitsShropshireId = "preset-hits-radio-black-country-shropshire"
-        val greatestHitsShropshireId = "preset-greatest-hits-black-country-shropshire"
-
-        var modified = false
-
-        if (favoriteStations.none { it.id == hitsShropshireId }) {
-            favoriteStations.add(
-                0,
-                RadioStation(
-                    id = hitsShropshireId,
-                    name = "Hits Radio Black Country & Shropshire",
-                    streamUrl = "http://edge-bauermz-01-gos2.sharp-stream.com/freeblackcountry.mp3",
-                    country = "UK",
-                    tags = "Shropshire • Black Country • Free Radio",
-                    favicon = "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Hits_Radio_2022.svg/512px-Hits_Radio_2022.svg.png"
-                )
+        val presets = listOf(
+            RadioStation(
+                id = "preset-hits-radio-black-country-shropshire",
+                name = "Hits Radio Black Country & Shropshire",
+                streamUrl = "https://stream-mz.hellorayo.co.uk/freeblackcountry.aac?direct=true&aw_0_1st.playerid=BMUK_Airable",
+                country = "UK",
+                tags = "Shropshire • Black Country • Rayo",
+                favicon = "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Hits_Radio_2022.svg/512px-Hits_Radio_2022.svg.png"
+            ),
+            RadioStation(
+                id = "preset-hits-radio-shropshire-alt",
+                name = "Hits Radio Shropshire (Stream 2 MP3)",
+                streamUrl = "https://stream-al.hellorayo.co.uk/freeshropshire.mp3?direct=true&aw_0_1st.playerid=BMUK_Airable",
+                country = "UK",
+                tags = "Shropshire • Telford • Shrewsbury",
+                favicon = "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Hits_Radio_2022.svg/512px-Hits_Radio_2022.svg.png"
+            ),
+            RadioStation(
+                id = "preset-greatest-hits-black-country-shropshire",
+                name = "Greatest Hits Radio Black Country & Shropshire",
+                streamUrl = "https://stream-mz.hellorayo.co.uk/net2blackcountry.aac?direct=true&aw_0_1st.playerid=BMUK_Airable",
+                country = "UK",
+                tags = "70s 80s 90s • Shropshire",
+                favicon = "https://upload.wikimedia.org/wikipedia/en/thumb/5/52/Greatest_Hits_Radio_logo.svg/512px-Greatest_Hits_Radio_logo.svg.png"
             )
-            modified = true
-        }
+        )
 
-        if (favoriteStations.none { it.id == greatestHitsShropshireId }) {
-            favoriteStations.add(
-                1,
-                RadioStation(
-                    id = greatestHitsShropshireId,
-                    name = "Greatest Hits Radio Black Country & Shropshire",
-                    streamUrl = "http://tx.planetradio.co.uk/icecast.php?i=net2blackcountry.mp3",
-                    country = "UK",
-                    tags = "70s 80s 90s • Shropshire",
-                    favicon = "https://upload.wikimedia.org/wikipedia/en/thumb/5/52/Greatest_Hits_Radio_logo.svg/512px-Greatest_Hits_Radio_logo.svg.png"
-                )
-            )
-            modified = true
-        }
-
-        if (modified) {
-            saveFavorites()
-        }
+        // Usuwamy stare wersje tych stacji (ze starymi niedziałającymi linkami) i wstawiamy nowe
+        val presetIds = presets.map { it.id }.toSet()
+        favoriteStations.removeAll { it.id in presetIds }
+        favoriteStations.addAll(0, presets)
+        saveFavorites()
     }
 
     private fun updateSongTitleText(title: String?, artist: String?) {
+        val stationName = currentStation?.name?.trim()
         currentSongTitle = when {
-            !title.isNullOrBlank() && !artist.isNullOrBlank() -> "$artist - $title"
-            !title.isNullOrBlank() -> title
+            !title.isNullOrBlank() && !artist.isNullOrBlank() && title != stationName -> "$artist - $title"
+            !title.isNullOrBlank() && title != stationName -> title
             !artist.isNullOrBlank() -> artist
-            else -> currentStation?.name?.let { "Na żywo: $it" } ?: "Odtwarzanie radia"
+            else -> stationName?.let { "Na żywo: $it" } ?: "Odtwarzanie radia"
         }
     }
 
@@ -178,14 +181,13 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
                     val preset = RadioStation(
                         id = "preset-hits-radio-black-country-shropshire",
                         name = "Hits Radio Black Country & Shropshire",
-                        streamUrl = "http://edge-bauermz-01-gos2.sharp-stream.com/freeblackcountry.mp3",
+                        streamUrl = "https://stream-mz.hellorayo.co.uk/freeblackcountry.aac?direct=true&aw_0_1st.playerid=BMUK_Airable",
                         country = "UK",
-                        tags = "Shropshire • Black Country • Free Radio",
+                        tags = "Shropshire • Black Country • Rayo",
                         favicon = "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Hits_Radio_2022.svg/512px-Hits_Radio_2022.svg.png"
                     )
-                    if (apiResults.none { it.id == preset.id }) {
-                        apiResults.add(0, preset)
-                    }
+                    apiResults.removeAll { it.id == preset.id }
+                    apiResults.add(0, preset)
                 }
                 searchResults = apiResults
             } catch (e: Exception) {
@@ -198,7 +200,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
 
     fun playStation(station: RadioStation) {
         val controller = mediaController ?: return
-        if (currentStation?.id == station.id) {
+        if (currentStation?.id == station.id && controller.isPlaying) {
             togglePlayPause()
             return
         }
@@ -216,12 +218,16 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             } catch (_: Exception) {}
         }
 
+        val cleanStreamUrl = station.streamUrl.trim()
+
         val mediaItem = MediaItem.Builder()
             .setMediaId(station.id)
-            .setUri(station.streamUrl)
+            .setUri(cleanStreamUrl)
             .setMediaMetadata(metadataBuilder.build())
             .build()
 
+        controller.stop()
+        controller.clearMediaItems()
         controller.setMediaItem(mediaItem)
         controller.prepare()
         controller.play()
@@ -232,6 +238,9 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         if (controller.isPlaying) {
             controller.pause()
         } else {
+            if (controller.playbackState == Player.STATE_IDLE || controller.playbackState == Player.STATE_ENDED) {
+                controller.prepare()
+            }
             controller.play()
         }
     }
@@ -273,7 +282,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             tags = "Własny strumień",
             favicon = iconUrl.trim()
         )
-        favoriteStations.add(newStation)
+        favoriteStations.add(0, newStation)
         saveFavorites()
     }
 
