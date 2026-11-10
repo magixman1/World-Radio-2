@@ -1,9 +1,13 @@
 package com.example.worldradio
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
+import android.view.ViewGroup
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -42,6 +46,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.SubcomposeAsyncImage
 
@@ -247,7 +252,8 @@ fun RadioApp(viewModel: RadioViewModel = viewModel()) {
                     onNext = { viewModel.nextStation() },
                     onPrev = { viewModel.previousStation() },
                     onToggleFav = { viewModel.toggleFavorite(station) },
-                    onCollapse = { isPlayerExpanded = false }
+                    onCollapse = { isPlayerExpanded = false },
+                    onStopPlayback = { viewModel.stopPlayback() }
                 )
             }
         }
@@ -366,6 +372,7 @@ fun SamsungMiniPlayer(
     }
 }
 
+@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun SamsungFullPlayerScreen(
     station: RadioStation,
@@ -376,9 +383,12 @@ fun SamsungFullPlayerScreen(
     onNext: () -> Unit,
     onPrev: () -> Unit,
     onToggleFav: () -> Unit,
-    onCollapse: () -> Unit
+    onCollapse: () -> Unit,
+    onStopPlayback: () -> Unit
 ) {
     BackHandler(onBack = onCollapse)
+
+    var showWebPlayer by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val audioManager = remember { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
@@ -416,434 +426,19 @@ fun SamsungFullPlayerScreen(
                 )
             }
             Text(
-                text = "TERAZ ODTWARZANE",
+                text = if (showWebPlayer) "ODTWARZACZ WEB (RAYO)" else "TERAZ ODTWARZANE",
                 color = Color(0xFFB5B9C9),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.5.sp
             )
-            IconButton(onClick = onToggleFav) {
-                Icon(
-                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = "Ulubione",
-                    tint = if (isFavorite) Color(0xFFFF4D6D) else Color.White,
-                    modifier = Modifier.size(26.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(28.dp))
-
-        Box(
-            modifier = Modifier
-                .size(270.dp)
-                .shadow(24.dp, RoundedCornerShape(36.dp))
-                .clip(RoundedCornerShape(36.dp))
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(
-                            Color(0xFF6A3DE8),
-                            Color(0xFF1F7AE0),
-                            Color(0xFF00D2FF)
-                        )
-                    )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            StationArtwork(
-                faviconUrl = station.favicon,
-                iconSize = 96.dp,
-                modifier = Modifier.fillMaxSize()
-            )
-
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 14.dp),
-                color = Color.Black.copy(alpha = 0.55f),
-                shape = RoundedCornerShape(50)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(if (isPlaying) Color(0xFF00FF88) else Color.Gray)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (isPlaying) "LIVE STREAM" else "PAUZA",
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(36.dp))
-
-        Text(
-            text = station.name.trim(),
-            color = Color.White,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = songTitle,
-            color = Color(0xFF00D2FF),
-            fontSize = 15.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(28.dp))
-
-        SamsungWaveBar(isPlaying = isPlaying)
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = onPrev,
-                modifier = Modifier.size(56.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.SkipPrevious,
-                    contentDescription = "Poprzednia stacja",
-                    tint = Color.White,
-                    modifier = Modifier.size(40.dp)
-                )
-            }
-
-            Surface(
-                modifier = Modifier
-                    .size(78.dp)
-                    .shadow(16.dp, CircleShape)
-                    .clip(CircleShape)
-                    .clickable { onPlayPause() },
-                shape = CircleShape,
-                color = Color.White
-            ) {
-                Box(contentAlignment = Alignment.Center) {
+            Row {
+                // Przycisk przełączania na odtwarzacz Web (WebView dla stacji Rayo / Beverley FM)
+                IconButton(onClick = {
+                    if (!showWebPlayer) onStopPlayback()
+                    showWebPlayer = !showWebPlayer
+                }) {
                     Icon(
-                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = "Play/Pause",
-                        tint = Color(0xFF131629),
-                        modifier = Modifier.size(42.dp)
-                    )
-                }
-            }
-
-            IconButton(
-                onClick = onNext,
-                modifier = Modifier.size(56.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.SkipNext,
-                    contentDescription = "Następna stacja",
-                    tint = Color.White,
-                    modifier = Modifier.size(40.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(28.dp))
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Default.VolumeDown,
-                contentDescription = "Ciszej",
-                tint = Color(0xFFA5AABF)
-            )
-            Slider(
-                value = currentVolume,
-                onValueChange = { newVol ->
-                    currentVolume = newVol
-                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVol.toInt(), 0)
-                },
-                valueRange = 0f..maxVolume.toFloat(),
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 12.dp),
-                colors = SliderDefaults.colors(
-                    thumbColor = Color.White,
-                    activeTrackColor = Color(0xFF8C7AE6),
-                    inactiveTrackColor = Color.White.copy(alpha = 0.2f)
-                )
-            )
-            Icon(
-                imageVector = Icons.Default.VolumeUp,
-                contentDescription = "Głośniej",
-                tint = Color(0xFFA5AABF)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-    }
-}
-
-@Composable
-fun SamsungWaveBar(isPlaying: Boolean) {
-    val infiniteTransition = rememberInfiniteTransition(label = "wave")
-    val phase by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(600, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "wave_anim"
-    )
-
-    val heights = listOf(0.4f, 0.7f, 1.0f, 0.6f, 0.9f, 0.5f, 0.8f, 1.0f, 0.6f, 0.9f, 0.5f, 0.7f, 0.4f)
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(28.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            heights.forEachIndexed { index, base ->
-                val factor = if (isPlaying) {
-                    if (index % 2 == 0) base * phase else base * (1.3f - phase)
-                } else {
-                    0.2f
-                }
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 4.dp)
-                        .width(4.dp)
-                        .fillMaxHeight(factor.coerceIn(0.15f, 1f))
-                        .clip(RoundedCornerShape(50))
-                        .background(Color(0xFF8C7AE6))
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text("STRUMIEŃ AUDIO", color = Color(0xFF888EA8), fontSize = 11.sp)
-            Text(if (isPlaying) "NA ŻYWO" else "WSTRZYMANO", color = Color(0xFF8C7AE6), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
-fun SearchScreen(viewModel: RadioViewModel) {
-    var query by remember { mutableStateOf("") }
-
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            placeholder = { Text("Szukaj stacji lub kraju (np. RMF, Rock, Polska)...", color = Color.Gray) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            shape = RoundedCornerShape(28.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color(0xFF171926),
-                unfocusedContainerColor = Color(0xFF171926),
-                focusedBorderColor = Color(0xFF8C7AE6),
-                unfocusedBorderColor = Color.Transparent,
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White
-            ),
-            trailingIcon = {
-                IconButton(onClick = { viewModel.search(query) }) {
-                    Icon(Icons.Default.Search, contentDescription = "Szukaj", tint = Color(0xFF8C7AE6))
-                }
-            },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { viewModel.search(query) })
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (viewModel.isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color(0xFF8C7AE6))
-            }
-        } else {
-            StationList(
-                stations = viewModel.searchResults,
-                currentStation = viewModel.currentStation,
-                isFavorite = { viewModel.isFavorite(it) },
-                onPlay = { viewModel.playStation(it) },
-                onToggleFav = { viewModel.toggleFavorite(it) }
-            )
-        }
-    }
-}
-
-@Composable
-fun FavoritesScreen(viewModel: RadioViewModel) {
-    if (viewModel.favoriteStations.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                "Brak zapisanych stacji.\nDodaj je z wyszukiwarki lub kliknij '+' u góry.",
-                color = Color.Gray,
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.bodyLarge
-            )
-        }
-    } else {
-        Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
-            StationList(
-                stations = viewModel.favoriteStations,
-                currentStation = viewModel.currentStation,
-                isFavorite = { true },
-                onPlay = { viewModel.playStation(it) },
-                onToggleFav = { viewModel.toggleFavorite(it) }
-            )
-        }
-    }
-}
-
-@Composable
-fun StationList(
-    stations: List<RadioStation>,
-    currentStation: RadioStation?,
-    isFavorite: (RadioStation) -> Boolean,
-    onPlay: (RadioStation) -> Unit,
-    onToggleFav: (RadioStation) -> Unit
-) {
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        items(stations, key = { it.id }) { station ->
-            val isSelected = currentStation?.id == station.id
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(22.dp))
-                    .clickable { onPlay(station) },
-                shape = RoundedCornerShape(22.dp),
-                color = if (isSelected) Color(0xFF282442) else Color(0xFF171926)
-            ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    StationArtwork(
-                        faviconUrl = station.favicon,
-                        iconSize = 24.dp,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(
-                                if (isSelected) Brush.linearGradient(listOf(Color(0xFF7B61FF), Color(0xFF00D2FF)))
-                                else Brush.linearGradient(listOf(Color(0xFF25283D), Color(0xFF25283D)))
-                            )
-                    )
-                    Spacer(modifier = Modifier.width(14.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = station.name.trim(),
-                            color = if (isSelected) Color(0xFFB5A8FF) else Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "${station.country.ifEmpty { "Świat" }} • ${station.tags.ifEmpty { "Radio" }}",
-                            color = Color(0xFF8E93A6),
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    IconButton(onClick = { onToggleFav(station) }) {
-                        Icon(
-                            imageVector = if (isFavorite(station)) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = "Ulubione",
-                            tint = if (isFavorite(station)) Color(0xFFFF4D6D) else Color.Gray
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun AddStationDialog(
-    onDismiss: () -> Unit,
-    onAdd: (name: String, url: String, country: String, iconUrl: String) -> Unit
-) {
-    var name by remember { mutableStateOf("") }
-    var url by remember { mutableStateOf("") }
-    var country by remember { mutableStateOf("") }
-    var iconUrl by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Color(0xFF1F2233),
-        titleContentColor = Color.White,
-        textContentColor = Color.White,
-        title = { Text("Dodaj własną stację") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Nazwa stacji") },
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = url,
-                    onValueChange = { url = it },
-                    label = { Text("URL strumienia (np. mp3/aac)") },
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = country,
-                    onValueChange = { country = it },
-                    label = { Text("Kraj (opcjonalnie)") },
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = iconUrl,
-                    onValueChange = { iconUrl = it },
-                    label = { Text("URL ikony stacji (opcjonalnie)") },
-                    singleLine = true
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { if (name.isNotBlank() && url.isNotBlank()) onAdd(name, url, country, iconUrl) },
-                enabled = name.isNotBlank() && url.isNotBlank()
-            ) {
-                Text("Dodaj")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Anuluj")
-            }
-        }
-    )
-}
+                        imageVector = if (showWebPlayer) Icons.Default.Radio else Icons.Default.Public,
+                        contentDescription = "Przełącz na WebPlayer / Stream",
+                        tint = if (showWebPlayer) Color(0xFF00D2FF) else Color
