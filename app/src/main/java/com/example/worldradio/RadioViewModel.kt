@@ -52,7 +52,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     var isLoading by mutableStateOf(false)
         private set
 
-    // Lista zapasowych strumieni próbowanych automatycznie, gdy serwer zwróci BAD_HTTP_STATUS
     private var fallbackUrls = mutableListOf<String>()
     private var fallbackIndex = 0
 
@@ -106,51 +105,54 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
-                    // Jeśli mamy kolejny zapasowy link na liście, automatycznie go wypróbuj
                     if (fallbackIndex < fallbackUrls.size) {
                         val nextUrl = fallbackUrls[fallbackIndex]
                         fallbackIndex++
-                        currentSongTitle = "Przełączanie na serwer zapasowy ($fallbackIndex)..."
+                        currentSongTitle = "Przełączanie na strumień zapasowy ($fallbackIndex/${fallbackUrls.size})..."
                         playDirectUrl(nextUrl)
                     } else {
-                        currentSongTitle = "Błąd strumienia (kod: ${error.errorCodeName})"
+                        currentSongTitle = "Strumień wymaga WebPlayera (kliknij ikonę 🌐 poniżej)"
                     }
                 }
             })
         }, ContextCompat.getMainExecutor(application))
 
-        search("UK")
+        search("Shropshire")
     }
 
     private fun ensureDefaultPresetStations() {
+        val skey = System.currentTimeMillis() / 1000
         val presets = listOf(
             RadioStation(
                 id = "preset-hits-radio-black-country-shropshire",
                 name = "Hits Radio Black Country & Shropshire",
-                streamUrl = "http://tx.planetradio.co.uk/http_live_bauer.php?i=freeblackcountry.mp3",
+                streamUrl = "https://stream-mz.hellorayo.co.uk/freeblackcountry.aac?direct=true&aw_0_1st.skey=$skey&aw_0_1st.playerid=BMUK_RPi",
                 country = "UK",
-                tags = "Shropshire • Black Country • Free Radio",
+                tags = "https://hellorayo.co.uk/hits-radio/shropshire/",
                 favicon = "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Hits_Radio_2022.svg/512px-Hits_Radio_2022.svg.png"
-            ),
-            RadioStation(
-                id = "preset-greatest-hits-black-country-shropshire",
-                name = "Greatest Hits Radio Shropshire",
-                streamUrl = "http://tx.planetradio.co.uk/http_live_bauer.php?i=net2blackcountry.mp3",
-                country = "UK",
-                tags = "70s 80s 90s • Shropshire",
-                favicon = "https://upload.wikimedia.org/wikipedia/en/thumb/5/52/Greatest_Hits_Radio_logo.svg/512px-Greatest_Hits_Radio_logo.svg.png"
             ),
             RadioStation(
                 id = "preset-beverley-fm",
                 name = "Beverley FM 107.8",
-                streamUrl = "https://s2.radio.co/s774878795/listen",
+                streamUrl = "https://beverleyfm.com/radio-player/",
                 country = "UK",
-                tags = "Beverley • Local Radio",
+                tags = "https://beverleyfm.com/radio-player/",
+                favicon = ""
+            ),
+            RadioStation(
+                id = "preset-bbc-shropshire",
+                name = "BBC Radio Shropshire",
+                streamUrl = "http://as-hls-ww-live.akamaized.net/pool_904/live/ww/bbc_radio_shropshire/bbc_radio_shropshire.isml/bbc_radio_shropshire-audio%3d96000.norewind.m3u8",
+                country = "UK",
+                tags = "Shropshire • Telford • Shrewsbury",
                 favicon = ""
             )
         )
 
-        val presetIds = presets.map { it.id }.toSet() + setOf("preset-hits-radio-shropshire-alt")
+        val presetIds = presets.map { it.id }.toSet() + setOf(
+            "preset-hits-radio-shropshire-alt",
+            "preset-greatest-hits-black-country-shropshire"
+        )
         favoriteStations.removeAll { it.id in presetIds }
         favoriteStations.addAll(0, presets)
         saveFavorites()
@@ -191,14 +193,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             isLoading = true
             try {
                 val apiResults = RetrofitInstance.api.searchStations(query.trim()).toMutableList()
-                val q = query.trim().lowercase()
-                if (q.contains("hits") || q.contains("shropshire") || q.contains("black country") || q.contains("free")) {
-                    val preset = favoriteStations.firstOrNull { it.id == "preset-hits-radio-black-country-shropshire" }
-                    if (preset != null) {
-                        apiResults.removeAll { it.id == preset.id }
-                        apiResults.add(0, preset)
-                    }
-                }
                 searchResults = apiResults
             } catch (e: Exception) {
                 searchResults = emptyList()
@@ -217,36 +211,33 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         currentStation = station
         currentSongTitle = "Łączenie z ${station.name}..."
 
-        // Budujemy kolejkę serwerów zapasowych dla stacji Hits Radio / Greatest Hits
         fallbackUrls.clear()
         fallbackIndex = 0
 
+        val skey = System.currentTimeMillis() / 1000
         val nameLower = station.name.lowercase()
-        if (nameLower.contains("greatest hits")) {
+
+        if (nameLower.contains("hits radio") || nameLower.contains("shropshire") && !nameLower.contains("bbc")) {
             fallbackUrls.addAll(
                 listOf(
-                    "http://tx.planetradio.co.uk/icecast.php?i=net2blackcountry.mp3",
-                    "http://edge-bauermz-01-gos2.sharp-stream.com/net2blackcountry.mp3",
-                    "http://edge-bauermz-01-gos2.sharp-stream.com/net2national.mp3",
-                    "https://stream-mz.hellorayo.co.uk/net2national.aac?direct=true&aw_0_1st.playerid=BMUK_RPlayer"
+                    "https://stream-mz.hellorayo.co.uk/freeblackcountry.mp3?direct=true&aw_0_1st.skey=1602676850",
+                    "https://stream-al.hellorayo.co.uk/freeshropshire.aac?direct=true&aw_0_1st.skey=$skey",
+                    "https://stream-mz.hellorayo.co.uk/hits.aac?direct=true&aw_0_1st.skey=1602676850",
+                    "http://edge-bauermz-01-gos2.sharp-stream.com/freeblackcountry.mp3?aw_0_1st.skey=$skey&aw_0_1st.playerid=BMUK_RPi",
+                    "http://edge-bauermz-01-gos2.sharp-stream.com/hits.mp3?aw_0_1st.skey=$skey&aw_0_1st.playerid=BMUK_RPi"
                 )
             )
-        } else if (nameLower.contains("hits radio") || nameLower.contains("shropshire") || nameLower.contains("free")) {
+        } else if (nameLower.contains("beverley")) {
             fallbackUrls.addAll(
                 listOf(
-                    "http://tx.planetradio.co.uk/icecast.php?i=freeblackcountry.mp3",
-                    "http://edge-bauermz-01-gos2.sharp-stream.com/freeblackcountry.mp3",
-                    "http://edge-bauermz-01-gos2.sharp-stream.com/freeshropshire.mp3",
-                    "http://edge-bauermz-01-gos2.sharp-stream.com/hits.mp3",
-                    "http://edge-bauermz-03-gos2.sharp-stream.com/hits.aac",
-                    "http://tx.planetradio.co.uk/http_live_bauer.php?i=hits.mp3",
-                    "https://stream-mz.hellorayo.co.uk/hits.aac?direct=true&aw_0_1st.playerid=BMUK_RPlayer"
+                    "https://stream.zeno.fm/beverley-fm-107-8",
+                    "http://s2.radio.co/s774878795/listen"
                 )
             )
         }
 
         viewModelScope.launch {
-            val resolvedUrl = resolvePlaylistIfNeeded(station.streamUrl.trim())
+            val resolvedUrl = resolveStreamFromUrlOrPage(station.streamUrl.trim())
             playDirectUrl(resolvedUrl)
         }
     }
@@ -279,17 +270,29 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         controller.play()
     }
 
-    // Jeśli użytkownik wklei link do pliku .m3u lub .pls, wyciągamy z niego właściwy link strumienia
-    private suspend fun resolvePlaylistIfNeeded(url: String): String = withContext(Dispatchers.IO) {
-        val lower = url.lowercase()
-        if (!lower.endsWith(".m3u") && !lower.endsWith(".pls")) {
-            return@withContext url
-        }
+    // Automatycznie wyciąga bezpośredni link audio ze strony HTML (np. beverleyfm.com/radio-player/) lub pliku .m3u/.pls
+    private suspend fun resolveStreamFromUrlOrPage(url: String): String = withContext(Dispatchers.IO) {
         try {
+            val lower = url.lowercase()
+            if (lower.endsWith(".mp3") || lower.endsWith(".aac") || lower.endsWith(".m3u8") || lower.contains("hellorayo") || lower.contains("sharp-stream")) {
+                return@withContext url
+            }
             val conn = URL(url).openConnection() as HttpURLConnection
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0")
             conn.connectTimeout = 8000
             conn.readTimeout = 8000
+            val contentType = conn.contentType?.lowercase() ?: ""
+            if (contentType.contains("audio") || contentType.contains("mpeg") || contentType.contains("aac") || contentType.contains("ogg")) {
+                conn.disconnect()
+                return@withContext url
+            }
             val text = conn.inputStream.bufferedReader().use { it.readText() }
+            // Szukamy linku strumienia w kodzie strony lub playliście
+            val regex = Regex("""(https?://[^\s"'<>]+(\.mp3|\.aac|\.m3u8|/listen|/stream|radio\.co/[^\s"'<>]+|zeno\.fm/[^\s"'<>]+|broadcast\.radio/[^\s"'<>]+|sharp-stream\.com/[^\s"'<>]+))""", RegexOption.IGNORE_CASE)
+            val match = regex.find(text)
+            if (match != null) {
+                return@withContext match.value
+            }
             for (line in text.lines()) {
                 val trimmed = line.trim()
                 if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
@@ -301,6 +304,10 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             }
         } catch (_: Exception) {}
         return@withContext url
+    }
+
+    fun stopPlayback() {
+        mediaController?.pause()
     }
 
     fun togglePlayPause() {
@@ -350,7 +357,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             name = name.trim(),
             streamUrl = url.trim(),
             country = country.trim().ifEmpty { "Własna" },
-            tags = "Własny strumień",
+            tags = url.trim(),
             favicon = iconUrl.trim()
         )
         favoriteStations.add(0, newStation)
