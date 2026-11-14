@@ -117,32 +117,33 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             })
         }, ContextCompat.getMainExecutor(application))
 
-        search("Shropshire")
+        search("Polska")
     }
 
     private fun ensureDefaultPresetStations() {
-        val skey = System.currentTimeMillis() / 1000
-        val presets = listOf(
-            RadioStation(
-                id = "preset-beverley-fm",
-                name = "Beverley FM 107.8",
-                streamUrl = "https://beverleyfm.com/radio-player/",
-                country = "UK",
-                tags = "https://beverleyfm.com/radio-player/",
-                favicon = ""
-            ),
-            RadioStation(
-                id = "preset-bbc-shropshire",
-                name = "BBC Radio Shropshire",
-                streamUrl = "http://as-hls-ww-live.akamaized.net/pool_904/live/ww/bbc_radio_shropshire/bbc_radio_shropshire.isml/bbc_radio_shropshire-audio%3d96000.norewind.m3u8",
-                country = "UK",
-                tags = "Shropshire • Telford • Shrewsbury",
-                favicon = ""
-            )
+        val beverleyPreset = RadioStation(
+            id = "preset-beverley-fm",
+            name = "107.8 Beverley FM",
+            streamUrl = "https://beverleyfm.com/radio-player/",
+            country = "UK",
+            tags = "https://beverleyfm.com/radio-player/",
+            favicon = ""
         )
-        favoriteStations.removeAll { it.id in presetIds }
-        favoriteStations.addAll(0, presets)
-        saveFavorites()
+
+        // Usunięto stare stacje Shropshire z ulubionych
+        val oldPresetIds = setOf(
+            "preset-hits-radio-black-country-shropshire",
+            "preset-hits-radio-shropshire-alt",
+            "preset-greatest-hits-black-country-shropshire",
+            "preset-bbc-shropshire"
+        )
+        favoriteStations.removeAll { it.id in oldPresetIds }
+
+        // Beverley FM jako jedyna domyślna stacja w ulubionych
+        if (favoriteStations.none { it.id == beverleyPreset.id }) {
+            favoriteStations.add(0, beverleyPreset)
+            saveFavorites()
+        }
     }
 
     private fun updateSongTitleText(title: String?, artist: String?) {
@@ -201,20 +202,8 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         fallbackUrls.clear()
         fallbackIndex = 0
 
-        val skey = System.currentTimeMillis() / 1000
         val nameLower = station.name.lowercase()
-
-        if (nameLower.contains("hits radio") || nameLower.contains("shropshire") && !nameLower.contains("bbc")) {
-            fallbackUrls.addAll(
-                listOf(
-                    "https://stream-mz.hellorayo.co.uk/freeblackcountry.mp3?direct=true&aw_0_1st.skey=1602676850",
-                    "https://stream-al.hellorayo.co.uk/freeshropshire.aac?direct=true&aw_0_1st.skey=$skey",
-                    "https://stream-mz.hellorayo.co.uk/hits.aac?direct=true&aw_0_1st.skey=1602676850",
-                    "http://edge-bauermz-01-gos2.sharp-stream.com/freeblackcountry.mp3?aw_0_1st.skey=$skey&aw_0_1st.playerid=BMUK_RPi",
-                    "http://edge-bauermz-01-gos2.sharp-stream.com/hits.mp3?aw_0_1st.skey=$skey&aw_0_1st.playerid=BMUK_RPi"
-                )
-            )
-        } else if (nameLower.contains("beverley")) {
+        if (nameLower.contains("beverley")) {
             fallbackUrls.addAll(
                 listOf(
                     "https://stream.zeno.fm/beverley-fm-107-8",
@@ -257,11 +246,10 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         controller.play()
     }
 
-    // Automatycznie wyciąga bezpośredni link audio ze strony HTML (np. beverleyfm.com/radio-player/) lub pliku .m3u/.pls
     private suspend fun resolveStreamFromUrlOrPage(url: String): String = withContext(Dispatchers.IO) {
         try {
             val lower = url.lowercase()
-            if (lower.endsWith(".mp3") || lower.endsWith(".aac") || lower.endsWith(".m3u8") || lower.contains("hellorayo") || lower.contains("sharp-stream")) {
+            if (lower.endsWith(".mp3") || lower.endsWith(".aac") || lower.endsWith(".m3u8") || lower.contains("zeno.fm")) {
                 return@withContext url
             }
             val conn = URL(url).openConnection() as HttpURLConnection
@@ -269,25 +257,15 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             conn.connectTimeout = 8000
             conn.readTimeout = 8000
             val contentType = conn.contentType?.lowercase() ?: ""
-            if (contentType.contains("audio") || contentType.contains("mpeg") || contentType.contains("aac") || contentType.contains("ogg")) {
+            if (contentType.contains("audio") || contentType.contains("mpeg") || contentType.contains("aac")) {
                 conn.disconnect()
                 return@withContext url
             }
             val text = conn.inputStream.bufferedReader().use { it.readText() }
-            // Szukamy linku strumienia w kodzie strony lub playliście
-            val regex = Regex("""(https?://[^\s"'<>]+(\.mp3|\.aac|\.m3u8|/listen|/stream|radio\.co/[^\s"'<>]+|zeno\.fm/[^\s"'<>]+|broadcast\.radio/[^\s"'<>]+|sharp-stream\.com/[^\s"'<>]+))""", RegexOption.IGNORE_CASE)
+            val regex = Regex("""(https?://[^\s"'<>]+(\.mp3|\.aac|\.m3u8|/listen|/stream|zeno\.fm/[^\s"'<>]+))""", RegexOption.IGNORE_CASE)
             val match = regex.find(text)
             if (match != null) {
                 return@withContext match.value
-            }
-            for (line in text.lines()) {
-                val trimmed = line.trim()
-                if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-                    return@withContext trimmed
-                }
-                if (trimmed.startsWith("File1=", ignoreCase = true)) {
-                    return@withContext trimmed.substringAfter("=").trim()
-                }
             }
         } catch (_: Exception) {}
         return@withContext url
