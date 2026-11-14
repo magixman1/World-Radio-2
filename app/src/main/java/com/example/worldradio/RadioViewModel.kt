@@ -124,14 +124,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         val skey = System.currentTimeMillis() / 1000
         val presets = listOf(
             RadioStation(
-                id = "preset-hits-radio-black-country-shropshire",
-                name = "Hits Radio Black Country & Shropshire",
-                streamUrl = "https://stream-mz.hellorayo.co.uk/freeblackcountry.aac?direct=true&aw_0_1st.skey=$skey&aw_0_1st.playerid=BMUK_RPi",
-                country = "UK",
-                tags = "https://hellorayo.co.uk/hits-radio/shropshire/",
-                favicon = "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Hits_Radio_2022.svg/512px-Hits_Radio_2022.svg.png"
-            ),
-            RadioStation(
                 id = "preset-beverley-fm",
                 name = "Beverley FM 107.8",
                 streamUrl = "https://beverleyfm.com/radio-player/",
@@ -147,11 +139,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
                 tags = "Shropshire • Telford • Shrewsbury",
                 favicon = ""
             )
-        )
-
-        val presetIds = presets.map { it.id }.toSet() + setOf(
-            "preset-hits-radio-shropshire-alt",
-            "preset-greatest-hits-black-country-shropshire"
         )
         favoriteStations.removeAll { it.id in presetIds }
         favoriteStations.addAll(0, presets)
